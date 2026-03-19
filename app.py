@@ -24,7 +24,13 @@ if scelta == "Unisci più File":
     uploaded_files = st.file_uploader("Carica file Excel o CSV", accept_multiple_files=True, type=['xlsx', 'csv'], key="unificatore")
     
     if uploaded_files:
-        dfs = {f.name: (pd.read_excel(f) if f.name.endswith('.xlsx') else pd.read_csv(f, sep=None, engine='python', decimal=',')) for f in uploaded_files}
+        dfs = {}
+        for f in uploaded_files:
+            if f.name.endswith('.xlsx'):
+                dfs[f.name] = pd.read_excel(f)
+            else:
+                dfs[f.name] = pd.read_csv(f, sep=None, engine='python', decimal=',')
+        
         main_file = st.selectbox("Scegli il file BASE (Master):", list(dfs.keys()))
         final_df = dfs[main_file].copy()
         
@@ -37,13 +43,13 @@ if scelta == "Unisci più File":
                     cols = st.multiselect(f"Colonne da aggiungere", [c for c in df.columns if c != col_r], key=f"C_{name}")
                     if st.button(f"Applica Unione {name}"):
                         final_df = pd.merge(final_df, df[[col_r] + cols], left_on=col_l, right_on=col_r, how='left')
-                        if col_left != col_right and col_right in final_df.columns:
-                            final_df.drop(columns=[col_right], inplace=True)
+                        if col_l != col_r and col_r in final_df.columns:
+                            final_df.drop(columns=[col_r], inplace=True)
                         st.success("Unito!")
 
         st.markdown("---")
-        st.subheader("👀 Anteprima Risultato Unificato")
-        st.dataframe(final_df.head(20).style.format(precision=2, decimal=',', thousands=''))
+        st.subheader("👀 Anteprima Risultato")
+        st.dataframe(final_df.head(20)) # Anteprima semplice per evitare errori
         st.download_button("📥 Scarica File Unito (Excel ITA)", convert_df(final_df), "file_unito_ita.csv")
 
 # --- MODALITÀ 2: ANALISI (PIVOT) ---
@@ -54,27 +60,26 @@ else:
     if single_file:
         df_analisi = pd.read_excel(single_file) if single_file.name.endswith('.xlsx') else pd.read_csv(single_file, sep=None, engine='python', decimal=',')
         
-        st.write("### 📜 Anteprima dei dati caricati")
-        st.dataframe(df_analisi.head(10).style.format(precision=2, decimal=',', thousands=''))
+        st.write("### 📜 Anteprima Dati")
+        st.dataframe(df_analisi.head(10))
         
         st.markdown("---")
-        st.subheader("⚙️ Configura la tua Tabella Riassuntiva")
+        st.subheader("⚙️ Configura Analisi")
         col1, col2 = st.columns(2)
         with col1:
-            raggruppa = st.selectbox("Raggruppa per (Righe):", df_analisi.columns)
+            raggruppa = st.selectbox("Raggruppa per:", df_analisi.columns)
         with col2:
             numeric_cols = df_analisi.select_dtypes(include=['number']).columns.tolist()
-            valore = st.selectbox("Cosa vuoi sommare? (Valori):", numeric_cols)
+            valore = st.selectbox("Cosa vuoi sommare?", numeric_cols)
             
         if st.button("🚀 Genera Analisi"):
-            # Calcolo
+            # Calcolo Pivot
             pivot = df_analisi.groupby(raggruppa)[valore].sum().reset_index()
             
-            # Visualizzazione chiara del risultato
             st.markdown(f"### ✅ Analisi Completata")
-            st.write(f"Somma di **{valore}** suddivisa per **{raggruppa}**")
+            st.write(f"Totale di **{valore}** per ogni **{raggruppa}**")
             
-            # Qui forziamo la virgola nella tabella che vedi a schermo
-            st.table(pivot.style.format({valore: '{:.2f}'.replace('.', ',')}))
+            # Mostriamo la tabella senza formattazioni complicate che causano errori
+            st.dataframe(pivot) 
             
-            st.download_button("📥 Scarica questa Tabella Pivot (Excel ITA)", convert_df(pivot), "analisi_pivot.csv")
+            st.download_button("📥 Scarica questa Analisi (Excel ITA)", convert_df(pivot), "analisi_pivot.csv")
